@@ -59,10 +59,7 @@ function manager:load(_map,_begin_x,_begin_y,_scale,_grid_size,_background,...)
     manager.begin_x = _begin_x
     manager.begin_y = _begin_y
     manager.scale = _scale
-    manager.hand_cords={}
-    manager.hand_cords.x=3
-    manager.hand_cords.y=-2
-    --manager.hand_cords={x=(#_map[1]-#map[1]%2)/2-1,y=4}
+    manager.hand_cords={x=(#_map[1]-#map[1]%2)/2-2,y=-4}
     manager.background = _background
     manager.tertrimino_images = images
     manager.hand_tetrimino=manager:getTetrimino()
@@ -70,7 +67,7 @@ function manager:load(_map,_begin_x,_begin_y,_scale,_grid_size,_background,...)
 end
 
 function manager:resetHand(tetrimino)
-    manager.hand_cords={x=(#manager.map[1]-#manager.map[1]%2)/2-1,y=-2}
+    manager.hand_cords={x=(#manager.map[1]-#manager.map[1]%2)/2-2,y=-4}
     manager.hand_tetrimino=manager.next_tetrimino
     manager.next_tetrimino=manager:getTetrimino()
 end
@@ -78,9 +75,9 @@ end
 function manager:checkMap()
     local indexes={}
     verify_row=true
-    for row = 1,#map,1 do
-        for col = 1,#map[1],1 do
-            if(map[row][col]==background)then verify_row=false end
+    for row = 1,#manager.map,1 do
+        for col = 1,#manager.map[1],1 do
+            if(manager.map[row][col]==background)then verify_row=false end
         end
         if(verify_row)then indexes[#indexes+1]={x=col,y=row} end
     end
@@ -89,6 +86,7 @@ end
 
 function manager:rotateHand()
     local temp_hand = {}
+    local verify=true
     for row = 1,4,1 do
         temp_hand[row]={}
         for col = 1,4,1 do
@@ -101,35 +99,62 @@ end
 function manager:handUpdate()
     local verify=true
     for row = 4,1,-1 do
-        local row_square=manager.hand_cords.y+row-1 
-        for col = 1,4,1 do
-            if(manager.hand_tetrimino[row][col]~=0 and row_square>=0)then
-                if(manager.hand_cords.y+row==#manager.map)then verify=false break end
-                if(manager.map[manager.hand_cords.y+row+1][manager.hand_cords.x+col]~=0)then verify=false end
-            end
+        for col=1,4,1 do
+            local row_square = manager.hand_cords.y+row
+            local col_square = manager.hand_cords.x+col
+            if(row_square>=1 and manager.hand_tetrimino[row][col]~=0)then
+                if(row_square==#manager.map)then verify=false 
+                elseif(manager.map[row_square+1][col_square]~=0)then verify=false
+                end
+            end 
         end
-    end
-    if(verify)then 
-        manager.hand_cords.y=manager.hand_cords.y+1
-    else 
-        for row=1,4,1 do
-            for col=1,4,1 do
-                local row_square = manager.hand_cords.y+row
-                local col_square = manager.hand_cords.x+col
-                if(manager.hand_tetrimino[row][col]~=0 and row_square<=#manager.map)then
-                    manager.map[row_square][col_square]=manager.hand_tetrimino[row][col]
+        if(not verify)then
+            for row_copy = 1,4,1 do
+                for col_copy =1,4,1 do
+                    if(manager.hand_tetrimino[row_copy][col_copy]~=0 and manager.hand_cords.y+row_copy>=1 and
+                        manager.hand_cords.x+col_copy>=1) then
+                        manager.map[manager.hand_cords.y+row_copy][manager.hand_cords.x+col_copy]=manager.hand_tetrimino[row_copy][col_copy]
+                    end
                 end
             end
+            manager:resetHand()
+            break
         end
-        manager:resetHand() 
     end
+    if(verify)then manager.hand_cords.y = manager.hand_cords.y+1; end
 end
 
 function manager:moveHand(direction)
-    if      (direction==rgt)then
-        
-    elseif  (direction==lft)then
-    elseif  (direction==dwn)then
+    local verify = true
+    if      (direction==moves.rgt)then
+        for col = 4,1,-1 do
+            for row = 1,4,1 do 
+                if(manager.hand_cords.y+row>=1 and manager.hand_cords.x+col<=#manager.map[1] and manager.hand_tetrimino[row][col]~=0)then
+                    if(manager.map[manager.hand_cords.y+row][manager.hand_cords.x+col+2]~=0)then verify=false end
+                else
+                    verify=false
+                end
+            end
+            if(verify)then
+                verify=false
+                manager.hand_cords.x=manager.hand_cords.x+1
+                break
+            end
+        end
+    elseif  (direction==moves.lft)then
+        for col = 1,4,1 do
+            for row = 1,4,1 do 
+                if(manager.hand_cords.x+col>=1 and manager.hand_cords.y+row>=1 and manager.hand_tetrimino[row][col]~=0)then
+                    if(manager.map[manager.hand_cords.y+row][manager.hand_cords.x+col-2]~=0)then verify=false end
+                end
+            end
+            if(verify)then
+                verify=false
+                manager.hand_cords.x=manager.hand_cords.x-1
+                break
+            end
+        end
+    elseif  (direction==moves.dwn)then
     end
 end
 
@@ -139,12 +164,12 @@ function manager:drawHand()
         for col=1,4,1 do
             if(manager.hand_tetrimino[row][col]~=background)then
                 temp_image = manager.tertrimino_images[manager.hand_tetrimino[row][col]]
-                local row_square=manager.hand_cords.x+col-1
-                local col_square=manager.hand_cords.y+row-1
-                if(0<=row_square and 0<=col_square)then
+                local row_square=manager.hand_cords.x+col
+                local col_square=manager.hand_cords.y+row
+                if(0<row_square and 0<col_square)then
                     love.graphics.draw( temp_image,
                     manager.begin_x+(manager.hand_cords.x+col-1)*manager.scale*manager.grid_size,
-                    manager.begin_x+(manager.hand_cords.y+row-1)*manager.scale*manager.grid_size,0,manager.scale,manager.scale,0,0,0,0)
+                    manager.begin_y+(manager.hand_cords.y+row-1)*manager.scale*manager.grid_size,0,manager.scale,manager.scale,0,0,0,0)
                 end
             end
         end
